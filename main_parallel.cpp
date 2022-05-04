@@ -53,6 +53,7 @@ void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
     {
         while (!pq.empty() && workCounter)
         {
+            workCounter--;
             Node min = pq.back();
     
             pq.pop_back();
@@ -90,6 +91,8 @@ void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
             break;
         }
 
+        workCounter = workPerCheck;
+
         //handle job requests by MPI_Recv
         if (myid == MASTER)
         {
@@ -109,6 +112,7 @@ void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
             MPI_Send( &request, 1, MPI_INT, MASTER, REQUEST, world );
             MPI_Recv( data, DATASIZE, MPI_INT, MASTER, REPLY, world, &status );
 
+            //add new node to stack
             Node newNode = Node(initial, x, y);
             newNode.deserialize(data);
             pq.push_back(newNode);
