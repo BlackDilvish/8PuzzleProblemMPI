@@ -6,7 +6,6 @@
 #include <array>
 #include <algorithm>
 #include <chrono>
-#include <omp.h>
 #include <string>
 #include <fstream>
 #include "node.h"
@@ -49,8 +48,18 @@ std::array<std::array<int, N>, N> getInputArray(const std::string& filename)
 
     return initial;
 }
+
+std::pair<int, int> getBlankPosition(const std::array<std::array<int, N>, N>& board)
+{
+    for (size_t i=0; i<board.size(); i++)
+        for (size_t j=0; j<board[i].size(); j++)
+            if (board[i][j] == 0)
+                return std::make_pair(i, j);
+                
+    return std::make_pair(-1, -1);
+}
  
-void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
+void solve(const std::array<std::array<int, N>, N>& initial)
 {
     int numprocs, myid, request = 1;
     int data[DATASIZE];
@@ -66,6 +75,7 @@ void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
  
     if (myid == MASTER) 
     {
+        auto [x, y] = getBlankPosition(initial);
         Node root = Node(initial, x, y);
         root.calculateCost();
         nodesStack.push_back(root);
@@ -89,13 +99,12 @@ void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
     
             if (min.cost == 0)
             {
+                printf("Found!\n");
                 min.printPath();
                 foundSolution = myid + 1;
-                printf("Found!\n");
                 break;
             }
-    
-            #pragma omp parallel for
+ 
             for (int i = 0; i < 4; i++)
             {
                 if (isSafe(min.x + row[i], min.y + col[i]))
@@ -147,7 +156,7 @@ void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
               MPI_Recv( data, DATASIZE, MPI_INT, MASTER, REPLY, world, &status );
               
               //add new node to stack
-              Node newNode = Node(initial, x, y);
+              Node newNode = Node(initial, 0, 0);
               newNode.deserialize(data);
               nodesStack.push_back(newNode);
               visitedNodes.push_back(newNode);
@@ -172,10 +181,8 @@ int main(int argc, char **argv)
     MPI_Init( &argc, &argv );
     
     std::array<std::array<int, N>, N> initial = getInputArray("input.txt");
- 
-    int x = 1, y = 2;
     
-    solve(initial, x, y);
+    solve(initial);
     
     MPI_Finalize();
  

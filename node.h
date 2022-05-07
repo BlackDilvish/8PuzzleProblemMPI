@@ -75,15 +75,7 @@ struct Node
 
     void printPath()
     {
-        // printMatrix();
-
-        // Node* par = parent;
-        // while (par != nullptr)
-        // {
-        //     par->printMatrix();
-        //     par = par->parent;
-        // }
-        printf("%d\n", level);
+        printf("Number of levels from start: %d", level);
     }
 
     void serialize(int* data)

@@ -5,9 +5,9 @@ EXE = run
 
 CXX = /opt/nfs/mpich-3.2/bin/mpicxx
 MPIEXEC = /opt/nfs/mpich-3.2/bin/mpiexec
-LDFLAGS = -fopenmp -o $(EXE)
+LDFLAGS =  -o $(EXE)
 MPIFLAGS = -n 4
-CPPFLAGS = -Wall -ggdb
+CPPFLAGS = -Wall -ggdb -std=c++17
 
 $(EXE): $(OBJ)
 	$(CXX) $(LDFLAGS) $(OBJ)
