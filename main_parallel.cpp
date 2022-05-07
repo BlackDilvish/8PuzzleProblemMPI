@@ -29,6 +29,7 @@ void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
     int numprocs, myid, request = 1;
     int data[DATASIZE];
     MPI_Status status;
+    auto start = std::chrono::steady_clock::now();
 
     
     MPI_Comm world = MPI_COMM_WORLD;
@@ -47,12 +48,11 @@ void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
     }
 
     int foundSolution = 0, receivedSolution = 0;
-    const int workPerCheck = 100;
+    const int workPerCheck = 1000;
     int workCounter = workPerCheck;
  
     while (!foundSolution)
     {
-        if (myid == MASTER && visitedNodes.size()%1000 == 0) printf("%d\n", visitedNodes.size());
     
         while (!pq.empty() && workCounter)
         {
@@ -60,13 +60,14 @@ void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
             Node min = pq.back();
     
             pq.pop_back();
-            if (visitedNodes.size()%1000 == 0) printf("%d\n", visitedNodes.size());
+            if (visitedNodes.size()%1000 == 0) printf("%lu\n", visitedNodes.size());
     
             if (min.cost == 0)
             {
                 min.printPath();
-                foundSolution = myid;
-                return;
+                foundSolution = myid + 1;
+                printf("Found!\n");
+                break;
             }
     
             for (int i = 0; i < 4; i++)
@@ -106,26 +107,37 @@ void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
                 {
                     //send data
                     pq[0].serialize(data);
+                    pq.erase(pq.begin());
                     MPI_Send( data, DATASIZE, MPI_INT, status.MPI_SOURCE, REPLY, world );
                 }
             }
         }
         else
         {
-            MPI_Send( &request, 1, MPI_INT, MASTER, REQUEST, world );
-            MPI_Recv( data, DATASIZE, MPI_INT, MASTER, REPLY, world, &status );
-
-            //add new node to stack
-            Node newNode = Node(initial, x, y);
-            newNode.deserialize(data);
-            pq.push_back(newNode);
-            visitedNodes.push_back(newNode);
+            if (pq.empty())
+            {
+              request = 1;
+              MPI_Send( &request, 1, MPI_INT, MASTER, REQUEST, world );
+              MPI_Recv( data, DATASIZE, MPI_INT, MASTER, REPLY, world, &status );
+              
+              //add new node to stack
+              Node newNode = Node(initial, x, y);
+              newNode.deserialize(data);
+              pq.push_back(newNode);
+              visitedNodes.push_back(newNode);
+            }
+            else
+            {
+              request = 0;
+              MPI_Send( &request, 1, MPI_INT, MASTER, REQUEST, world );
+            }
         }
     }
 
+    auto end = std::chrono::steady_clock::now();
     if (myid == MASTER)
     {
-        printf("%d", receivedSolution);
+        printf("Solution found in: %ld seconds\n", std::chrono::duration_cast<std::chrono::seconds>(end - start).count()); 
     }
 }
  
@@ -145,10 +157,7 @@ int main(int argc, char **argv)
  
     int x = 1, y = 2;
     
-    auto start = std::chrono::steady_clock::now();
     solve(initial, x, y);
-    auto end = std::chrono::steady_clock::now();
-    printf("Elapsed time in seconds: %u s", std::chrono::duration_cast<std::chrono::seconds>(end - start).count()); 
     
     MPI_Finalize();
  
