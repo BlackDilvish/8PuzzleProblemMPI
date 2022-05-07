@@ -6,6 +6,9 @@
 #include <array>
 #include <algorithm>
 #include <chrono>
+#include <omp.h>
+#include <string>
+#include <fstream>
 #include "node.h"
 #include "mpi.h"
 
@@ -23,6 +26,29 @@ int isSafe(int x, int y)
 {
     return (x >= 0 && x < N && y >= 0 && y < N);
 }
+
+std::array<std::array<int, N>, N> getInputArray(const std::string& filename)
+{
+    std::ifstream file(filename, std::ios::in);
+    std::string line;
+    std::array<std::array<int, 3>, 3> initial{};
+
+    int i = 0;
+    while (std::getline(file, line))
+    {
+        int j = 0;
+        for (char c : line)
+        {
+            if (c != ' ')
+            {
+                initial[i][j++] = c - '0';
+            }
+        }
+        i++;
+    }
+
+    return initial;
+}
  
 void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
 {
@@ -36,14 +62,13 @@ void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
     MPI_Comm_size( world, &numprocs );
     MPI_Comm_rank( world, &myid );
 
-
-    std::vector<Node> pq;
+    std::vector<Node> nodesStack;
  
     if (myid == MASTER) 
     {
         Node root = Node(initial, x, y);
         root.calculateCost();
-        pq.push_back(root);
+        nodesStack.push_back(root);
         visitedNodes.push_back(root);
     }
 
@@ -54,12 +79,12 @@ void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
     while (!foundSolution)
     {
     
-        while (!pq.empty() && workCounter)
+        while (!nodesStack.empty() && workCounter)
         {
             workCounter--;
-            Node min = pq.back();
+            Node min = nodesStack.back();
     
-            pq.pop_back();
+            nodesStack.pop_back();
             if (visitedNodes.size()%1000 == 0) printf("%lu\n", visitedNodes.size());
     
             if (min.cost == 0)
@@ -70,6 +95,7 @@ void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
                 break;
             }
     
+            #pragma omp parallel for
             for (int i = 0; i < 4; i++)
             {
                 if (isSafe(min.x + row[i], min.y + col[i]))
@@ -80,7 +106,7 @@ void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
 
                     if ((std::find(visitedNodes.begin(), visitedNodes.end(), child) == visitedNodes.end()))
                     {
-                        pq.push_back(child);
+                        nodesStack.push_back(child);
                         visitedNodes.push_back(child);
                     }
                 }
@@ -106,15 +132,15 @@ void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
                 if (request)
                 {
                     //send data
-                    pq[0].serialize(data);
-                    pq.erase(pq.begin());
+                    nodesStack[0].serialize(data);
+                    nodesStack.erase(nodesStack.begin());
                     MPI_Send( data, DATASIZE, MPI_INT, status.MPI_SOURCE, REPLY, world );
                 }
             }
         }
         else
         {
-            if (pq.empty())
+            if (nodesStack.empty())
             {
               request = 1;
               MPI_Send( &request, 1, MPI_INT, MASTER, REQUEST, world );
@@ -123,7 +149,7 @@ void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
               //add new node to stack
               Node newNode = Node(initial, x, y);
               newNode.deserialize(data);
-              pq.push_back(newNode);
+              nodesStack.push_back(newNode);
               visitedNodes.push_back(newNode);
             }
             else
@@ -145,15 +171,7 @@ int main(int argc, char **argv)
 {
     MPI_Init( &argc, &argv );
     
-    //std::array<std::array<int, N>, N> initial = {{{{1,2,3}}, {{5,6,0}}, {{7,8,4}}}};
-    std::array<std::array<int, N>, N> initial = {{{{1,5,2}}, {{4,3,0}}, {{7,8,6}}}};
- 
-    int final[N][N] =
-    {
-        {1, 2, 3},
-        {4, 5, 6},
-        {7, 8, 0}
-    };
+    std::array<std::array<int, N>, N> initial = getInputArray("input.txt");
  
     int x = 1, y = 2;
     
