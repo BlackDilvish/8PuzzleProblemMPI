@@ -5,6 +5,7 @@
 #include <queue>
 #include <array>
 #include <algorithm>
+#include <chrono>
 #include "node.h"
 #include "mpi.h"
 
@@ -29,8 +30,8 @@ void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
     int data[DATASIZE];
     MPI_Status status;
 
-    MPI_Init( &argc, &argv );
-    world = MPI_COMM_WORLD;
+    
+    MPI_Comm world = MPI_COMM_WORLD;
     MPI_Comm_size( world, &numprocs );
     MPI_Comm_rank( world, &myid );
 
@@ -46,11 +47,13 @@ void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
     }
 
     int foundSolution = 0, receivedSolution = 0;
-    const int workPerCheck = 10;
+    const int workPerCheck = 100;
     int workCounter = workPerCheck;
  
     while (!foundSolution)
     {
+        if (myid == MASTER && visitedNodes.size()%1000 == 0) printf("%d\n", visitedNodes.size());
+    
         while (!pq.empty() && workCounter)
         {
             workCounter--;
@@ -96,7 +99,7 @@ void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
         //handle job requests by MPI_Recv
         if (myid == MASTER)
         {
-            for (int i=0; i<numprocs-2; i++)
+            for (int i=0; i<numprocs-1; i++)
             {
                 MPI_Recv( &request, 1, MPI_INT, MPI_ANY_SOURCE, REQUEST, world, &status );
                 if (request)
@@ -122,15 +125,16 @@ void solve(const std::array<std::array<int, N>, N>& initial, int x, int y)
 
     if (myid == MASTER)
     {
-        std::cout << receivedSolution;
+        printf("%d", receivedSolution);
     }
-
-    MPI_Finalize();
 }
  
-int main()
+int main(int argc, char **argv)
 {
-    std::array<std::array<int, N>, N> initial = {{{{1,2,3}}, {{5,6,0}}, {{7,8,4}}}};
+    MPI_Init( &argc, &argv );
+    
+    //std::array<std::array<int, N>, N> initial = {{{{1,2,3}}, {{5,6,0}}, {{7,8,4}}}};
+    std::array<std::array<int, N>, N> initial = {{{{1,5,2}}, {{4,3,0}}, {{7,8,6}}}};
  
     int final[N][N] =
     {
@@ -140,7 +144,13 @@ int main()
     };
  
     int x = 1, y = 2;
+    
+    auto start = std::chrono::steady_clock::now();
     solve(initial, x, y);
+    auto end = std::chrono::steady_clock::now();
+    printf("Elapsed time in seconds: %u s", std::chrono::duration_cast<std::chrono::seconds>(end - start).count()); 
+    
+    MPI_Finalize();
  
     return 0;
 }
