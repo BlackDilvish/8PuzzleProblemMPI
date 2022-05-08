@@ -126,3 +126,7 @@ struct Node
         return (node1.cost + node1.level) > (node2.cost + node2.level);
     }
 };
+
+int isSafe(int x, int y);
+std::array<std::array<int, N>, N> getInputArray(const std::string& filename);
+std::pair<int, int> getBlankPosition(const std::array<std::array<int, N>, N>& board);
