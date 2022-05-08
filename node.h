@@ -5,6 +5,7 @@
 #include <climits>
 #include <vector>
 #include <queue>
+#include <string>
 #include <array>
 #include <algorithm>
 
@@ -73,9 +74,9 @@ struct Node
         return (x >= 0 && x < N && y >= 0 && y < N);
     }
 
-    void printPath()
+    std::string path()
     {
-        printf("Number of levels from start: %d", level);
+        return "Number of levels from start: " + std::to_string(level);
     }
 
     void serialize(int* data)

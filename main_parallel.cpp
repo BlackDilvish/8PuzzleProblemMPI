@@ -64,6 +64,7 @@ void solve(const std::array<std::array<int, N>, N>& initial)
     int numprocs, myid, request = 1;
     int data[DATASIZE];
     MPI_Status status;
+    std::string solutionPath;
     auto start = std::chrono::steady_clock::now();
 
     
@@ -100,7 +101,7 @@ void solve(const std::array<std::array<int, N>, N>& initial)
             if (min.cost == 0)
             {
                 printf("Found!\n");
-                min.printPath();
+                solutionPath = min.path();
                 foundSolution = myid + 1;
                 break;
             }
@@ -172,7 +173,11 @@ void solve(const std::array<std::array<int, N>, N>& initial)
     auto end = std::chrono::steady_clock::now();
     if (myid == MASTER)
     {
-        printf("Solution found in: %ld seconds\n", std::chrono::duration_cast<std::chrono::seconds>(end - start).count()); 
+        std::ofstream file;
+        file.open("output.txt");
+        file << solutionPath;
+        file << "Solution found in: " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() <<" seconds\n"; 
+        file.close();
     }
 }
  
