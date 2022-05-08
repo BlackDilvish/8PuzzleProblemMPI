@@ -96,7 +96,7 @@ void solve(const std::array<std::array<int, N>, N>& initial)
             Node min = nodesStack.back();
     
             nodesStack.pop_back();
-            if (visitedNodes.size()%1000 == 0) printf("Proc %u: visited nodes = %lu\n", myId, visitedNodes.size());
+            if (visitedNodes.size()%1000 == 0) printf("Proc %u: visited nodes = %lu\n", myid, visitedNodes.size());
     
             if (min.cost == 0)
             {
