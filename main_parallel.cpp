@@ -96,7 +96,7 @@ void solve(const std::array<std::array<int, N>, N>& initial)
             Node min = nodesStack.back();
     
             nodesStack.pop_back();
-            if (visitedNodes.size()%1000 == 0) printf("%lu\n", visitedNodes.size());
+            if (visitedNodes.size()%1000 == 0) printf("Proc %u: visited nodes = %lu\n", myId, visitedNodes.size());
     
             if (min.cost == 0)
             {
@@ -175,7 +175,7 @@ void solve(const std::array<std::array<int, N>, N>& initial)
     {
         std::ofstream file;
         file.open("output.txt");
-        file << solutionPath;
+        file << solutionPath << std::endl;
         file << "Solution found in: " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() <<" seconds\n"; 
         file.close();
     }
