@@ -11,11 +11,13 @@
 
 #define N 3
 
+std::array<std::array<int, N>, N> stringToArray(const std::string& str);
+std::string arrayToString(const std::array<std::array<int, N>, N>& array);
+
 struct Node
-{
-    Node* parent;
- 
-    std::array<std::array<int, N>, N> mat;
+{ 
+    //std::array<std::array<int, N>, N> mat;
+    std::string matString;
  
     int x, y;
     int cost = INT_MAX;
@@ -25,16 +27,19 @@ struct Node
 
     Node(const std::array<std::array<int, N>, N>& initial, int blankX, int blankY)
     {
-        mat = initial;
+        // mat = initial;
+        matString = arrayToString(initial);
         x = blankX;
         y = blankY;
     }
 
+    Node(const Node&) = default;
+
     Node copy()
     {
-        Node node(mat, x, y);
+        // Node node(mat, x, y);
+        Node node(stringToArray(matString), x, y);
 
-        node.parent = this;
         node.cost = INT_MAX;
         node.level = level;
 
@@ -45,12 +50,15 @@ struct Node
     {
         x = newX;
         y = newY;
+        auto mat = stringToArray(matString);
         std::swap(mat[oldX][oldY], mat[newX][newY]);
+        matString = arrayToString(mat);
         level++;
     }
 
     void printMatrix()
     {
+        auto mat = stringToArray(matString);
         for (int i = 0; i < N; i++)
         {
             for (int j = 0; j < N; j++)
@@ -62,6 +70,7 @@ struct Node
 
     void calculateCost()
     {
+        auto mat = stringToArray(matString);
         cost = 0;
         for (int i = 0; i < N; i++)
             for (int j = 0; j < N; j++)
@@ -81,6 +90,7 @@ struct Node
 
     void serialize(int* data)
     {
+        auto mat = stringToArray(matString);
         for (int i = 0; i < N; i++)
             for (int j = 0; j < N; j++)
             {
@@ -95,11 +105,14 @@ struct Node
 
     void deserialize(int* data)
     {
+        auto mat = stringToArray(matString);
         for (int i = 0; i < N; i++)
             for (int j = 0; j < N; j++)
             {
                 mat[i][j] = data[i*N + j];
             }
+
+        matString = arrayToString(mat);
 
         x = data[9];
         y = data[10];
@@ -109,10 +122,12 @@ struct Node
 
     friend bool operator==(const Node& node1, const Node& node2)
     {
+        auto mat1 = stringToArray(node1.matString);
+        auto mat2 = stringToArray(node2.matString);
         for (int i = 0; i < N; i++)
         {
             for (int j = 0; j < N; j++)
-                if (node1.mat[i][j] != node2.mat[i][j])
+                if (mat1[i][j] != mat2[i][j])
                 {
                     return false;
                 }
