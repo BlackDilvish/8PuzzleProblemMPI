@@ -41,25 +41,3 @@ std::pair<int, int> getBlankPosition(const std::array<std::array<int, N>, N>& bo
                 
     return std::make_pair(-1, -1);
 }
-
-std::array<std::array<int, N>, N> stringToArray(const std::string& str)
-{
-    std::array<std::array<int, N>, N> newBoard{};
-    
-    for (int i=0; i<N; i++)
-        for (int j=0; j<N; j++)
-            newBoard[i][j] = str[i*3 + j] - '0';
-
-    return newBoard;
-}
-
-std::string arrayToString(const std::array<std::array<int, N>, N>& array)
-{
-    std::string ss;
-    
-    for (int i=0; i<N; i++)
-        for (int j=0; j<N; j++)
-            ss += std::to_string(array[i][j]);
-    
-    return ss;
-}

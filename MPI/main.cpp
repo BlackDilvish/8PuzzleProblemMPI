@@ -9,7 +9,7 @@
 #include <string>
 #include <fstream>
 #include "node.h"
-#include <upcxx/upcxx.hpp>
+#include "mpi.h"
 
 #define MASTER    0
 #define REQUEST   1
@@ -25,15 +25,14 @@ void solve(const std::array<std::array<int, N>, N>& initial)
 {
     int numprocs, myid, request = 1;
     int data[DATASIZE];
-    //MPI_Status status;
+    MPI_Status status;
     std::string solutionPath;
     auto start = std::chrono::steady_clock::now();
-    bool sharedInitialized = false;
 
     // 1. Initialize MPI
-    //MPI_Comm world = MPI_COMM_WORLD;
-    numprocs = upcxx::rank_n(); //MPI_Comm_size( world, &numprocs );
-    myid = upcxx::rank_me(); //MPI_Comm_rank( world, &myid );
+    MPI_Comm world = MPI_COMM_WORLD;
+    MPI_Comm_size( world, &numprocs );
+    MPI_Comm_rank( world, &myid );
 
     std::vector<Node> nodesStack;
  
@@ -88,7 +87,7 @@ void solve(const std::array<std::array<int, N>, N>& initial)
         }
 
         //4. After some work, check if solution was found by MPI_Allreduce
-        upcxx::reduce_all(foundSolution, upcxx::op_fast_add).wait(); //MPI_Allreduce( &foundSolution, &receivedSolution, 1, MPI_INT, MPI_MAX, world);
+        MPI_Allreduce( &foundSolution, &receivedSolution, 1, MPI_INT, MPI_MAX, world);
         if (receivedSolution != 0)
         {
             break;
@@ -96,69 +95,46 @@ void solve(const std::array<std::array<int, N>, N>& initial)
 
         workCounter = workPerCheck;
 
-        if (!sharedInitialized)
+        //5. Handle job requests by MPI_Send and MPI_Recv
+        if (myid == MASTER)
         {
-            upcxx::global_ptr<Node> all_nodes_ptr = nullptr;
-            //5. Handle job requests by MPI_Send and MPI_Recv
-            if (myid == MASTER) // tak jak w reduce_to_rank0_global wsadzic do tablicy jakies node'y dla n procesow
+            for (int i=0; i<numprocs-1; i++)
             {
-                // for (int i=0; i<numprocs-1; i++)
-                // {
-                //     MPI_Recv( &request, 1, MPI_INT, MPI_ANY_SOURCE, REQUEST, world, &status );
-                //     if (request)
-                //     {
-                //         //Send data to workers
-                //         nodesStack.front().serialize(data);
-                //         nodesStack.erase(nodesStack.begin());
-                //         MPI_Send( data, DATASIZE, MPI_INT, status.MPI_SOURCE, REPLY, world );
-                //     }
-                // }
-
-                all_nodes_ptr = upcxx::new_array<Node>(upcxx::rank_n());
-                all_nodes_ptr = upcxx::broadcast(all_nodes_ptr, 0).wait();
-
-                for (int i=0; i<numprocs; i++)
+                MPI_Recv( &request, 1, MPI_INT, MPI_ANY_SOURCE, REQUEST, world, &status );
+                if (request)
                 {
-                    upcxx::global_ptr<Node> proc_node_ptr = all_nodes_ptr + i;
-
-                    Node nodeToSend = nodesStack.front();
+                    //Send data to workers
+                    nodesStack.front().serialize(data);
                     nodesStack.erase(nodesStack.begin());
-
-                    upcxx::rput(nodeToSend, proc_node_ptr).wait();
+                    MPI_Send( data, DATASIZE, MPI_INT, status.MPI_SOURCE, REPLY, world );
                 }
             }
-
-            upcxx::barrier();
-
-            if (myid != MASTER) // jak nie ma co robic to niech wyciagnie sobie z tablicy node'a
-            {
-                if (nodesStack.empty())
-                {
-                //   request = 1;
-                //   MPI_Send( &request, 1, MPI_INT, MASTER, REQUEST, world );
-                //   MPI_Recv( data, DATASIZE, MPI_INT, MASTER, REPLY, world, &status );
-                
-                //   //Add new node to stack
-                //   Node newNode = Node(initial, 0, 0);
-                //   newNode.deserialize(data);
-                //   nodesStack.push_back(newNode);
-                //   visitedNodes.push_back(newNode);
-                    Node* local_nodes_ptrs = all_nodes_ptr.local();
-                    Node newNode = local_nodes_ptrs[myid];
-                    nodesStack.push_back(newNode);
-                    visitedNodes.push_back(newNode);
-                }
-            }
-
-            sharedInitialized = true;
-            upcxx::delete_array(all_hits_ptr);
         }
-        
+        else
+        {
+            if (nodesStack.empty())
+            {
+              request = 1;
+              MPI_Send( &request, 1, MPI_INT, MASTER, REQUEST, world );
+              MPI_Recv( data, DATASIZE, MPI_INT, MASTER, REPLY, world, &status );
+              
+              //Add new node to stack
+              Node newNode = Node(initial, 0, 0);
+              newNode.deserialize(data);
+              nodesStack.push_back(newNode);
+              visitedNodes.push_back(newNode);
+            }
+            else
+            {
+              request = 0;
+              MPI_Send( &request, 1, MPI_INT, MASTER, REQUEST, world );
+            }
+        }
     }
 
     //6. Save solution in output.txt
     auto end = std::chrono::steady_clock::now();
-    if (myid == foundSolution-1)
+    if (myid == MASTER)
     {
         std::ofstream file;
         file.open("output.txt");
@@ -166,17 +142,16 @@ void solve(const std::array<std::array<int, N>, N>& initial)
         file << "Solution found in: " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() <<" seconds\n"; 
         file.close();
     }
-    // upcxx::delete_array(all_hits_ptr);
 }
  
 int main(int argc, char **argv)
 {
-    upcxx::init(); //MPI_Init( &argc, &argv );
+    MPI_Init( &argc, &argv );
     
     std::array<std::array<int, N>, N> initial = getInputArray("input.txt");
     solve(initial);
     
-    upcxx::finalize(); //MPI_Finalize();
+    MPI_Finalize();
  
     return 0;
 }
